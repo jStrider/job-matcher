@@ -5,10 +5,11 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { saveProfile } from "@/app/actions/profile";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileText, Loader2, User, MapPin, Briefcase, GraduationCap, Languages } from "lucide-react";
+import { Upload, FileText, Loader2, User, MapPin, Briefcase, GraduationCap, Languages, Link as LinkIcon } from "lucide-react";
 
 interface ProfileData {
   rawText: string;
@@ -28,9 +29,11 @@ export default function ProfilePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [rawText, setRawText] = useState("");
+  const [linkedinUrl, setLinkedinUrl] = useState("");
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [fetchingLinkedin, setFetchingLinkedin] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -49,6 +52,35 @@ export default function ProfilePage() {
         });
     }
   }, [session]);
+
+  async function handleLinkedInImport() {
+    if (!linkedinUrl.includes("linkedin.com")) {
+      setError("Entrez une URL LinkedIn valide (ex: https://linkedin.com/in/votre-profil)");
+      return;
+    }
+
+    setFetchingLinkedin(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/profile/linkedin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: linkedinUrl }),
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        setError(data.error);
+      } else if (data.text) {
+        setRawText(data.text);
+      }
+    } catch {
+      setError("Erreur lors de la récupération du profil LinkedIn");
+    }
+
+    setFetchingLinkedin(false);
+  }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -101,24 +133,62 @@ export default function ProfilePage() {
       <div>
         <h1 className="text-2xl font-bold">Mon profil</h1>
         <p className="text-slate-400">
-          Importez votre CV ou collez votre profil pour l&apos;analyser avec l&apos;IA
+          Importez votre profil LinkedIn, uploadez un CV ou collez votre profil
         </p>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Importer le profil</CardTitle>
-            <CardDescription>
-              Uploadez un PDF LinkedIn ou collez votre CV
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed border-slate-700 p-6 hover:border-emerald-500/50 transition-colors">
-                <Upload className="h-8 w-8 text-slate-500" />
+        <div className="space-y-4">
+          {/* LinkedIn URL Import — Primary */}
+          <Card className="border-emerald-500/30">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <LinkIcon className="h-5 w-5 text-emerald-400" />
+                Importer depuis LinkedIn
+              </CardTitle>
+              <CardDescription>
+                Collez l&apos;URL de votre profil LinkedIn public
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex gap-2">
+                <Input
+                  value={linkedinUrl}
+                  onChange={(e) => setLinkedinUrl(e.target.value)}
+                  placeholder="https://linkedin.com/in/votre-profil"
+                  type="url"
+                />
+                <Button
+                  onClick={handleLinkedInImport}
+                  disabled={!linkedinUrl.trim() || fetchingLinkedin}
+                  className="shrink-0"
+                >
+                  {fetchingLinkedin ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Importer"
+                  )}
+                </Button>
+              </div>
+              <p className="text-xs text-slate-500">
+                Le profil doit être public. L&apos;IA extrait les données via le web.
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* PDF Upload + Text — Secondary */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Autres options</CardTitle>
+              <CardDescription>
+                PDF LinkedIn ou texte libre
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <label className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed border-slate-700 p-4 hover:border-emerald-500/50 transition-colors">
+                <Upload className="h-6 w-6 text-slate-500" />
                 <span className="text-sm text-slate-400">
-                  {loading ? "Lecture en cours..." : "Cliquez pour uploader un PDF"}
+                  {loading ? "Lecture en cours..." : "Uploader un PDF"}
                 </span>
                 <input
                   type="file"
@@ -128,45 +198,36 @@ export default function ProfilePage() {
                   disabled={loading}
                 />
               </label>
-            </div>
 
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-800" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-slate-900 px-2 text-slate-500">ou collez votre CV</span>
-              </div>
-            </div>
+              <Textarea
+                value={rawText}
+                onChange={(e) => setRawText(e.target.value)}
+                placeholder="Ou collez ici le texte de votre CV..."
+                className="min-h-[200px]"
+              />
 
-            <Textarea
-              value={rawText}
-              onChange={(e) => setRawText(e.target.value)}
-              placeholder="Collez ici le texte de votre CV ou profil LinkedIn..."
-              className="min-h-[300px]"
-            />
+              {error && <p className="text-sm text-red-400">{error}</p>}
 
-            {error && <p className="text-sm text-red-400">{error}</p>}
-
-            <Button
-              onClick={handleAnalyze}
-              disabled={!rawText.trim() || analyzing}
-              className="w-full"
-            >
-              {analyzing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Analyse en cours...
-                </>
-              ) : (
-                <>
-                  <FileText className="mr-2 h-4 w-4" />
-                  Analyser avec l&apos;IA
-                </>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
+              <Button
+                onClick={handleAnalyze}
+                disabled={!rawText.trim() || analyzing}
+                className="w-full"
+              >
+                {analyzing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Analyse en cours...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Analyser avec l&apos;IA
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
 
         {profile && (
           <div className="space-y-4">
@@ -174,7 +235,7 @@ export default function ProfilePage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <User className="h-5 w-5 text-emerald-400" />
-                  Resume
+                  Résumé
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -192,7 +253,7 @@ export default function ProfilePage() {
                 )}
                 {profile.yearsExperience && (
                   <p className="text-sm text-slate-400">
-                    {profile.yearsExperience} ans d&apos;experience
+                    {profile.yearsExperience} ans d&apos;expérience
                   </p>
                 )}
                 {profile.summary && (
@@ -203,7 +264,7 @@ export default function ProfilePage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm">Competences</CardTitle>
+                <CardTitle className="text-sm">Compétences</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
@@ -249,7 +310,7 @@ export default function ProfilePage() {
             {profile.desiredRoles.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-sm">Roles recherches</CardTitle>
+                  <CardTitle className="text-sm">Rôles recherchés</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
