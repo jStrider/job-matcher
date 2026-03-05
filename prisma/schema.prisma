@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  password  String
+  name      String?
+  profile   Profile?
+  searches  Search[]
+  jobs      SavedJob[]
+  createdAt DateTime   @default(now())
+}
+
+model Profile {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id])
+  rawText          String
+  summary          String?
+  currentTitle     String?
+  yearsExperience  Int?
+  skills           String[]
+  languages        String[]
+  education        String?
+  location         String?
+  desiredRoles     String[]
+  desiredSalary    String?
+  remotePreference String?
+  updatedAt        DateTime @updatedAt
+}
+
+model Search {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  query     String
+  location  String?
+  results   Job[]
+  createdAt DateTime @default(now())
+}
+
+model Job {
+  id             String     @id @default(cuid())
+  searchId       String
+  search         Search     @relation(fields: [searchId], references: [id])
+  title          String
+  company        String
+  location       String?
+  salary         String?
+  remote         String?
+  contract       String?
+  description    String
+  url            String
+  source         String
+  atsScore       Int?
+  scoreBreakdown Json?
+  missingSkills  String[]
+  matchingSkills String[]
+  savedJobs      SavedJob[]
+  createdAt      DateTime   @default(now())
+}
+
+model SavedJob {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  jobId     String
+  job       Job       @relation(fields: [jobId], references: [id])
+  status    String    @default("saved")
+  notes     String?
+  appliedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([userId, jobId])
+}
