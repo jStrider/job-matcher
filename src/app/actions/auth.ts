@@ -3,6 +3,8 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { signIn } from "@/lib/auth";
+import { AuthError } from "next-auth";
+import { redirect } from "next/navigation";
 
 export async function registerUser(formData: FormData) {
   const email = formData.get("email") as string;
@@ -15,7 +17,7 @@ export async function registerUser(formData: FormData) {
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
-    return { error: "Un compte existe deja avec cet email" };
+    return { error: "Un compte existe déjà avec cet email" };
   }
 
   const hashed = await bcrypt.hash(password, 12);
@@ -23,7 +25,20 @@ export async function registerUser(formData: FormData) {
     data: { email, password: hashed, name: name || null },
   });
 
-  await signIn("credentials", { email, password, redirectTo: "/profile" });
+  try {
+    await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return { error: "Erreur lors de la connexion" };
+    }
+    throw error;
+  }
+
+  redirect("/profile");
 }
 
 export async function loginUser(formData: FormData) {
@@ -35,11 +50,17 @@ export async function loginUser(formData: FormData) {
   }
 
   try {
-    await signIn("credentials", { email, password, redirectTo: "/dashboard" });
-  } catch (error: unknown) {
-    if (error && typeof error === "object" && "type" in error && error.type === "CredentialsSignin") {
+    await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+  } catch (error) {
+    if (error instanceof AuthError) {
       return { error: "Email ou mot de passe incorrect" };
     }
     throw error;
   }
+
+  redirect("/dashboard");
 }
