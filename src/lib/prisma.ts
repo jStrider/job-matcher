@@ -1,11 +1,18 @@
 import { PrismaClient } from "@/generated/prisma";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
 function makePrisma() {
-  return new PrismaClient();
+  const url = process.env.DATABASE_URL;
+  if (!url || url.includes("dummy")) {
+    // Build-time: return a stub that won't connect
+    return new PrismaClient() as PrismaClient;
+  }
+  const adapter = new PrismaPg({ connectionString: url });
+  return new PrismaClient({ adapter });
 }
 
 export const prisma = new Proxy({} as PrismaClient, {
