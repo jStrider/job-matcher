@@ -37,11 +37,11 @@ interface SavedJobItem {
 }
 
 const columns = [
-  { id: "saved", label: "Sauvegardees", color: "border-slate-600" },
-  { id: "applied", label: "Candidatees", color: "border-blue-600" },
+  { id: "saved", label: "Sauvegardées", color: "border-slate-600" },
+  { id: "applied", label: "Candidatures", color: "border-blue-600" },
   { id: "interview", label: "Entretien", color: "border-yellow-600" },
   { id: "offer", label: "Offre", color: "border-green-600" },
-  { id: "rejected", label: "Refusee", color: "border-red-600" },
+  { id: "rejected", label: "Refusée", color: "border-red-600" },
 ];
 
 export default function JobsPage() {
@@ -103,7 +103,7 @@ export default function JobsPage() {
 
       {jobs.length === 0 ? (
         <div className="text-center py-16">
-          <p className="text-slate-400 mb-4">Aucune offre sauvegardee</p>
+          <p className="text-slate-400 mb-4">Aucune offre sauvegardée</p>
           <Link href="/search">
             <Button>Rechercher des offres</Button>
           </Link>

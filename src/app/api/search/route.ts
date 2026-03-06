@@ -7,13 +7,13 @@ import { scoreJobATS } from "@/lib/ai";
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Non authentifie" }, { status: 401 });
+    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
   const { query, location, remote, contract } = await request.json();
 
   if (!query?.trim()) {
-    return NextResponse.json({ error: "Requete de recherche requise" }, { status: 400 });
+    return NextResponse.json({ error: "Requête de recherche requise" }, { status: 400 });
   }
 
   const profile = await prisma.profile.findUnique({
@@ -30,20 +30,23 @@ export async function POST(request: NextRequest) {
   });
 
   try {
-    const results = await searchJobs(query, location);
+    const results = await searchJobs(query, location, remote, contract);
 
-    // Create jobs from search results
+    // Fetch all job descriptions in parallel (with timeout)
+    const descriptionsPromises = results.map(async (result) => {
+      try {
+        const fullDesc = await fetchJobDescription(result.url);
+        return fullDesc.length > 100 ? fullDesc : result.snippet;
+      } catch {
+        return result.snippet;
+      }
+    });
+    const descriptions = await Promise.all(descriptionsPromises);
+
+    // Create all jobs in DB
     const jobs = await Promise.all(
-      results.map(async (result) => {
-        let description = result.snippet;
-        try {
-          const fullDesc = await fetchJobDescription(result.url);
-          if (fullDesc.length > 100) description = fullDesc;
-        } catch {
-          // Keep snippet as fallback
-        }
-
-        return prisma.job.create({
+      results.map((result, i) =>
+        prisma.job.create({
           data: {
             searchId: search.id,
             title: result.title,
@@ -51,15 +54,15 @@ export async function POST(request: NextRequest) {
             location: result.location,
             url: result.url,
             source: result.source,
-            description,
+            description: descriptions[i],
             remote: remote || null,
             contract: contract || null,
           },
-        });
-      })
+        })
+      )
     );
 
-    // Score jobs with ATS in parallel (max 5 concurrent)
+    // Score all jobs with ATS in parallel (all at once, API handles rate limiting)
     if (profile) {
       const profileData = {
         skills: profile.skills,
@@ -71,28 +74,24 @@ export async function POST(request: NextRequest) {
         desiredRoles: profile.desiredRoles,
       };
 
-      const batchSize = 5;
-      for (let i = 0; i < jobs.length; i += batchSize) {
-        const batch = jobs.slice(i, i + batchSize);
-        await Promise.allSettled(
-          batch.map(async (job) => {
-            try {
-              const score = await scoreJobATS(profileData, job.title, job.description);
-              await prisma.job.update({
-                where: { id: job.id },
-                data: {
-                  atsScore: score.totalScore,
-                  scoreBreakdown: JSON.parse(JSON.stringify(score.breakdown)),
-                  matchingSkills: score.matchingSkills,
-                  missingSkills: score.missingSkills,
-                },
-              });
-            } catch {
-              // Skip scoring on failure
-            }
-          })
-        );
-      }
+      await Promise.allSettled(
+        jobs.map(async (job) => {
+          try {
+            const score = await scoreJobATS(profileData, job.title, job.description);
+            await prisma.job.update({
+              where: { id: job.id },
+              data: {
+                atsScore: score.totalScore,
+                scoreBreakdown: JSON.parse(JSON.stringify(score.breakdown)),
+                matchingSkills: score.matchingSkills,
+                missingSkills: score.missingSkills,
+              },
+            });
+          } catch {
+            // Skip scoring on failure
+          }
+        })
+      );
     }
 
     const scoredJobs = await prisma.job.findMany({
@@ -103,7 +102,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ searchId: search.id, jobs: scoredJobs });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erreur de recherche" },
+      { error: error instanceof Error ? error.message : "Erreur lors de la recherche. Veuillez réessayer." },
       { status: 500 }
     );
   }

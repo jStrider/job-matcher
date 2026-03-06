@@ -34,12 +34,12 @@ export default function LoginPage() {
             <span className="text-xl font-bold">Job Matcher</span>
           </Link>
           <CardTitle className="text-xl">
-            {isRegister ? "Creer un compte" : "Se connecter"}
+            {isRegister ? "Créer un compte" : "Se connecter"}
           </CardTitle>
           <CardDescription>
             {isRegister
-              ? "Creez votre compte pour commencer a matcher"
-              : "Connectez-vous a votre compte"}
+              ? "Créez votre compte pour commencer à matcher"
+              : "Connectez-vous à votre compte"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -86,13 +86,13 @@ export default function LoginPage() {
               {loading
                 ? "Chargement..."
                 : isRegister
-                ? "Creer le compte"
+                ? "Créer le compte"
                 : "Se connecter"}
             </Button>
           </form>
 
           <div className="mt-4 text-center text-sm text-slate-400">
-            {isRegister ? "Deja un compte ?" : "Pas encore de compte ?"}{" "}
+            {isRegister ? "Déjà un compte ?" : "Pas encore de compte ?"}{" "}
             <button
               onClick={() => {
                 setIsRegister(!isRegister);
@@ -100,7 +100,7 @@ export default function LoginPage() {
               }}
               className="text-emerald-400 hover:underline"
             >
-              {isRegister ? "Se connecter" : "Creer un compte"}
+              {isRegister ? "Se connecter" : "Créer un compte"}
             </button>
           </div>
         </CardContent>

@@ -78,7 +78,7 @@ export default function SearchPage() {
         setJobs(data.jobs || []);
       }
     } catch {
-      setError("Erreur lors de la recherche");
+      setError("Erreur de connexion au serveur. Veuillez réessayer.");
     }
     setSearching(false);
   }
@@ -107,13 +107,13 @@ export default function SearchPage() {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Titre du poste, competences..."
+            placeholder="Titre du poste, compétences..."
             className="flex-1"
           />
           <Input
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            placeholder="Ville, region..."
+            placeholder="Ville, région..."
             className="w-48"
           />
           <Button type="submit" disabled={searching || !query.trim()}>
@@ -128,7 +128,7 @@ export default function SearchPage() {
         <div className="flex gap-3">
           <Select value={remote} onChange={(e) => setRemote(e.target.value)}>
             <option value="">Tous les modes</option>
-            <option value="remote">Teletravail</option>
+            <option value="remote">Télétravail</option>
             <option value="hybrid">Hybride</option>
             <option value="onsite">Sur site</option>
           </Select>
@@ -147,7 +147,10 @@ export default function SearchPage() {
         <div className="flex flex-col items-center gap-3 py-12">
           <Loader2 className="h-10 w-10 animate-spin text-emerald-400" />
           <p className="text-slate-400">
-            Recherche et analyse ATS en cours...
+            Recherche en cours...
+          </p>
+          <p className="text-xs text-slate-500">
+            Analyse des offres et calcul des scores ATS. Cela peut prendre jusqu&apos;à 30 secondes.
           </p>
         </div>
       )}
@@ -161,7 +164,7 @@ export default function SearchPage() {
       {jobs.length > 0 && (
         <div className="space-y-3">
           <p className="text-sm text-slate-400">
-            {jobs.length} resultat{jobs.length > 1 ? "s" : ""} trouve{jobs.length > 1 ? "s" : ""}
+            {jobs.length} résultat{jobs.length > 1 ? "s" : ""} trouvé{jobs.length > 1 ? "s" : ""}
           </p>
 
           {jobs.map((job) => (

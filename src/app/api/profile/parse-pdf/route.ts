@@ -12,7 +12,7 @@ async function extractTextFromPDF(buffer: Buffer): Promise<string> {
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Non authentifie" }, { status: 401 });
+    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
   const formData = await request.formData();

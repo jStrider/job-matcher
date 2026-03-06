@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 
 export async function saveProfile(formData: FormData) {
   const session = await auth();
-  if (!session?.user?.id) return { error: "Non authentifie" };
+  if (!session?.user?.id) return { error: "Non authentifié" };
 
   const rawText = formData.get("rawText") as string;
   if (!rawText?.trim()) return { error: "Texte du profil requis" };
@@ -55,7 +55,7 @@ export async function saveProfile(formData: FormData) {
 
 export async function updateProfileField(field: string, value: string | string[]) {
   const session = await auth();
-  if (!session?.user?.id) return { error: "Non authentifie" };
+  if (!session?.user?.id) return { error: "Non authentifié" };
 
   const profile = await prisma.profile.findUnique({
     where: { userId: session.user.id },

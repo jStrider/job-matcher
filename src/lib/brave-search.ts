@@ -22,18 +22,44 @@ function detectSource(url: string): string {
   return "other";
 }
 
+const CONTRACT_KEYWORDS = ["CDI", "CDD", "Freelance", "Stage", "Alternance", "Interim"];
+const LOCATION_PATTERN = /^[A-ZÀ-Ú][a-zà-ú]+([\s-][A-ZÀ-Ú]?[a-zà-ú]+)*(\s*\(\d{2,5}\))?$/;
+
 function parseJobFromResult(result: BraveSearchResult): ParsedJobResult {
   const title = result.title
     .replace(/ - Indeed.*$/, "")
+    .replace(/ \| Indeed$/, "")
     .replace(/ \| LinkedIn$/, "")
     .replace(/ - Welcome to the Jungle$/, "")
     .replace(/ - Apec\.fr$/, "")
+    .replace(/ \| Apec$/, "")
     .trim();
 
   const parts = title.split(" - ");
-  const jobTitle = parts[0]?.trim() || title;
-  const company = parts[1]?.trim() || "Entreprise non specifiee";
-  const location = parts[2]?.trim() || null;
+
+  // Filter out contract types and locations to find the real company
+  let jobTitle = parts[0]?.trim() || title;
+  let company = "Entreprise non spécifiée";
+  let location: string | null = null;
+
+  for (let i = 1; i < parts.length; i++) {
+    const part = parts[i].trim();
+    // Skip contract type keywords
+    if (CONTRACT_KEYWORDS.some((k) => part.toUpperCase().includes(k.toUpperCase()))) continue;
+    // Skip gender markers like (H/F), (F/H), (H/F/X)
+    if (/^\(?\s*[HFX]\s*\/\s*[HFX]\s*(\/\s*[HFX]\s*)?\)?$/.test(part)) continue;
+    // Detect location patterns (city name, possibly with postal code)
+    if (LOCATION_PATTERN.test(part) && company !== "Entreprise non spécifiée") {
+      location = part;
+      continue;
+    }
+    // First valid non-contract part is the company
+    if (company === "Entreprise non spécifiée") {
+      company = part;
+    } else if (!location) {
+      location = part;
+    }
+  }
 
   return {
     title: jobTitle,
@@ -48,14 +74,18 @@ function parseJobFromResult(result: BraveSearchResult): ParsedJobResult {
 export async function searchJobs(
   query: string,
   location?: string,
-  count: number = 20
+  remote?: string,
+  contract?: string,
+  count: number = 10
 ): Promise<ParsedJobResult[]> {
   const apiKey = process.env.BRAVE_API_KEY;
-  if (!apiKey) throw new Error("BRAVE_API_KEY non configuree");
+  if (!apiKey) throw new Error("BRAVE_API_KEY non configurée");
 
-  const sites = "site:indeed.fr OR site:linkedin.com/jobs OR site:welcometothejungle.com OR site:apec.fr";
+  const sites = "site:indeed.fr OR site:linkedin.com/jobs OR site:welcometothejungle.com OR site:apec.fr OR site:francetravail.fr";
   const locationQuery = location ? ` ${location}` : "";
-  const searchQuery = `"${query}"${locationQuery} ${sites}`;
+  const remoteQuery = remote === "remote" ? " télétravail" : remote === "hybrid" ? " hybride" : "";
+  const contractQuery = contract ? ` ${contract}` : "";
+  const searchQuery = `${query}${locationQuery}${remoteQuery}${contractQuery} emploi ${sites}`;
 
   const params = new URLSearchParams({
     q: searchQuery,

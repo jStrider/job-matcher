@@ -8,7 +8,7 @@ export async function GET(
 ) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Non authentifie" }, { status: 401 });
+    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
   const { id } = await params;
@@ -18,7 +18,7 @@ export async function GET(
   });
 
   if (!job) {
-    return NextResponse.json({ error: "Offre non trouvee" }, { status: 404 });
+    return NextResponse.json({ error: "Offre non trouvée" }, { status: 404 });
   }
 
   const savedJob = await prisma.savedJob.findUnique({

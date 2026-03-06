@@ -100,9 +100,9 @@ export default function DashboardPage() {
         <Card className="border-emerald-800 bg-emerald-950/20">
           <CardContent className="flex items-center justify-between p-6">
             <div className="space-y-1">
-              <p className="font-semibold">Profil non configure</p>
+              <p className="font-semibold">Profil non configuré</p>
               <p className="text-sm text-slate-400">
-                Importez votre CV pour obtenir des scores ATS personnalises
+                Importez votre CV pour obtenir des scores ATS personnalisés
               </p>
             </div>
             <Link href="/profile">
@@ -121,7 +121,7 @@ export default function DashboardPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400">Recherches</p>
+                <p className="text-sm text-slate-400">Recherches effectuées</p>
                 <p className="text-2xl font-bold">{data.stats.totalSearches}</p>
               </div>
               <Search className="h-8 w-8 text-slate-700" />
@@ -132,7 +132,7 @@ export default function DashboardPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400">Offres analysees</p>
+                <p className="text-sm text-slate-400">Offres analysées</p>
                 <p className="text-2xl font-bold">{data.stats.totalJobs}</p>
               </div>
               <Briefcase className="h-8 w-8 text-slate-700" />
@@ -143,7 +143,7 @@ export default function DashboardPage() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400">Offres sauvegardees</p>
+                <p className="text-sm text-slate-400">Offres sauvegardées</p>
                 <p className="text-2xl font-bold">{data.stats.savedJobs}</p>
               </div>
               <TrendingUp className="h-8 w-8 text-slate-700" />
@@ -181,7 +181,7 @@ export default function DashboardPage() {
           <CardContent>
             {data.topJobs.length === 0 ? (
               <p className="text-sm text-slate-500 text-center py-4">
-                Aucune offre analysee
+                Aucune offre analysée
               </p>
             ) : (
               <div className="space-y-3">
@@ -208,12 +208,12 @@ export default function DashboardPage() {
         {/* Skill gaps */}
         <Card>
           <CardHeader>
-            <CardTitle>Competences manquantes frequentes</CardTitle>
+            <CardTitle>Compétences manquantes fréquentes</CardTitle>
           </CardHeader>
           <CardContent>
             {data.stats.topMissingSkills.length === 0 ? (
               <p className="text-sm text-slate-500 text-center py-4">
-                Pas encore de donnees
+                Pas encore de données
               </p>
             ) : (
               <div className="space-y-3">
@@ -238,7 +238,7 @@ export default function DashboardPage() {
           <CardContent>
             {data.stats.scoreDistribution.length === 0 ? (
               <p className="text-sm text-slate-500 text-center py-4">
-                Pas encore de donnees
+                Pas encore de données
               </p>
             ) : (
               <div className="space-y-2">
@@ -264,12 +264,12 @@ export default function DashboardPage() {
         {/* Recent searches */}
         <Card>
           <CardHeader>
-            <CardTitle>Recherches recentes</CardTitle>
+            <CardTitle>Recherches récentes</CardTitle>
           </CardHeader>
           <CardContent>
             {data.recentSearches.length === 0 ? (
               <p className="text-sm text-slate-500 text-center py-4">
-                Aucune recherche effectuee
+                Aucune recherche effectuée
               </p>
             ) : (
               <div className="space-y-3">
