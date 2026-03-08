@@ -24,9 +24,9 @@ export async function POST() {
   // Build multiple targeted searches based on profile
   const searches: { query: string; location?: string }[] = [];
 
-  // Search by ALL desired roles (not just first 3)
+  // Search by desired roles (cap at 5 to limit API calls)
   if (profile.desiredRoles.length > 0) {
-    for (const role of profile.desiredRoles) {
+    for (const role of profile.desiredRoles.slice(0, 5)) {
       searches.push({
         query: role,
         location: profile.location || undefined,

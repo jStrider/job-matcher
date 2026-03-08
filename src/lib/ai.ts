@@ -26,13 +26,13 @@ export async function extractProfile(rawText: string): Promise<ExtractedProfile>
         role: "user",
         content: `Analyse ce CV/profil et extrais les informations structurees. Reponds UNIQUEMENT en JSON valide, sans markdown.
 
-IMPORTANT pour "desiredRoles": Tu DOIS deduire au minimum 5 a 8 titres de postes pertinents, meme s'ils ne sont pas explicitement mentionnes dans le profil. Base-toi sur:
-- Le titre actuel (et ses variantes: Senior, Lead, Principal, Head of, Responsable, etc.)
-- L'experience et les competences pour deduire des roles connexes
-- Les intitules courants sur le marche francais (ex: "Ingenieur DevOps", "SRE", "Platform Engineer" sont des roles connexes)
-- Des variantes en francais ET en anglais
-
-Exemple: si le titre est "DevOps Engineer", genere: ["DevOps Engineer", "Ingénieur DevOps", "Senior DevOps Engineer", "Lead DevOps", "SRE", "Site Reliability Engineer", "Platform Engineer", "Cloud Engineer"]
+IMPORTANT pour "desiredRoles": Tu DOIS deduire 5 a 8 titres de postes pertinents. REGLES STRICTES:
+- Base-toi UNIQUEMENT sur les informations presentes dans le CV/profil (titre, experience, competences mentionnees)
+- N'invente PAS de technologies ou competences non mentionnees dans le profil
+- Genere des variantes du titre actuel (Senior, Lead, Principal, Head of, Responsable)
+- Genere des equivalents francais ET anglais du meme role
+- Les roles connexes doivent etre directement lies aux competences listees dans le profil
+- Ne rajoute JAMAIS de technologie specifique (AWS, Azure, GCP, etc.) si elle n'est pas dans le profil
 
 CV/Profil:
 ${rawText}
