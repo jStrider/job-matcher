@@ -194,6 +194,35 @@ async function fetchBraveSearch(linkedinUrl: string, username: string): Promise<
   );
 }
 
+function isInternalUrl(urlString: string): boolean {
+  try {
+    const parsed = new URL(urlString);
+    const hostname = parsed.hostname.toLowerCase();
+
+    // Block localhost and hostnames without a dot (e.g. "internal-server")
+    if (hostname === "localhost" || !hostname.includes(".")) return true;
+
+    // Resolve IPv4 ranges: 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16
+    const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (ipv4Match) {
+      const [, a, b] = ipv4Match.map(Number);
+      if (a === 127) return true;
+      if (a === 10) return true;
+      if (a === 172 && b >= 16 && b <= 31) return true;
+      if (a === 192 && b === 168) return true;
+      if (a === 169 && b === 254) return true;
+      if (a === 0) return true;
+    }
+
+    // Block IPv6 loopback
+    if (hostname === "[::1]" || hostname === "[0:0:0:0:0:0:0:1]") return true;
+
+    return false;
+  } catch {
+    return true; // If URL parsing fails, treat as internal (block it)
+  }
+}
+
 async function fetchRelatedPages(searchResults: string, username: string): Promise<string> {
   const urlMatches = searchResults.matchAll(/URL: (https?:\/\/[^\s]+)/g);
   const relatedContent: string[] = [];
@@ -202,6 +231,7 @@ async function fetchRelatedPages(searchResults: string, username: string): Promi
     const url = match[1];
     if (url.includes("linkedin.com")) continue;
     if (relatedContent.length >= 2) break;
+    if (isInternalUrl(url)) continue;
 
     try {
       const res = await fetch(url, {
