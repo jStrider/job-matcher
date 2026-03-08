@@ -21,7 +21,7 @@ model User {
 model Profile {
   id               String   @id @default(cuid())
   userId           String   @unique
-  user             User     @relation(fields: [userId], references: [id])
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   rawText          String
   summary          String?
   currentTitle     String?
@@ -39,17 +39,19 @@ model Profile {
 model Search {
   id        String   @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   query     String
   location  String?
   results   Job[]
   createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 model Job {
   id             String     @id @default(cuid())
   searchId       String
-  search         Search     @relation(fields: [searchId], references: [id])
+  search         Search     @relation(fields: [searchId], references: [id], onDelete: Cascade)
   title          String
   company        String
   location       String?
@@ -65,18 +67,22 @@ model Job {
   matchingSkills String[]
   savedJobs      SavedJob[]
   createdAt      DateTime   @default(now())
+
+  @@index([searchId])
+  @@index([atsScore])
 }
 
 model SavedJob {
   id        String    @id @default(cuid())
   userId    String
-  user      User      @relation(fields: [userId], references: [id])
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   jobId     String
-  job       Job       @relation(fields: [jobId], references: [id])
+  job       Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
   status    String    @default("saved")
   notes     String?
   appliedAt DateTime?
   createdAt DateTime  @default(now())
 
   @@unique([userId, jobId])
+  @@index([userId, status])
 }

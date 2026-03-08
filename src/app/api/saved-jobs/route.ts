@@ -1,30 +1,30 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireAuth, isAuthError, apiHandler } from "@/lib/api-utils";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-  }
+  return apiHandler("saved-jobs/GET", async () => {
+    const session = await requireAuth();
+    if (isAuthError(session)) return session;
 
-  const jobs = await prisma.savedJob.findMany({
-    where: { userId: session.user.id },
-    include: {
-      job: {
-        select: {
-          id: true,
-          title: true,
-          company: true,
-          location: true,
-          atsScore: true,
-          url: true,
-          source: true,
+    const jobs = await prisma.savedJob.findMany({
+      where: { userId: session.user.id },
+      include: {
+        job: {
+          select: {
+            id: true,
+            title: true,
+            company: true,
+            location: true,
+            atsScore: true,
+            url: true,
+            source: true,
+          },
         },
       },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+      orderBy: { createdAt: "desc" },
+    });
 
-  return NextResponse.json({ jobs });
+    return NextResponse.json({ jobs });
+  });
 }

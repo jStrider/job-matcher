@@ -1,38 +1,50 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { searchJobs, fetchJobDescription } from "@/lib/brave-search";
 import { scoreJobATS } from "@/lib/ai";
+import { requireAuth, isAuthError, apiHandler, extractProfileForScoring } from "@/lib/api-utils";
+import { searchSchema } from "@/lib/validations";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-  }
+  return apiHandler("search/POST", async () => {
+    const session = await requireAuth();
+    if (isAuthError(session)) return session;
 
-  const { query, location, remote, contract } = await request.json();
+    const body = await request.json();
+    const parsed = searchSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || "Donnees invalides" },
+        { status: 400 }
+      );
+    }
 
-  if (!query?.trim()) {
-    return NextResponse.json({ error: "Requête de recherche requise" }, { status: 400 });
-  }
+    const { query, location, remote, contract } = parsed.data;
 
-  const profile = await prisma.profile.findUnique({
-    where: { userId: session.user.id },
-  });
+    const profile = await prisma.profile.findUnique({
+      where: { userId: session.user.id },
+      select: {
+        skills: true,
+        currentTitle: true,
+        yearsExperience: true,
+        education: true,
+        location: true,
+        languages: true,
+        desiredRoles: true,
+      },
+    });
 
-  // Create search record
-  const search = await prisma.search.create({
-    data: {
-      userId: session.user.id,
-      query,
-      location: location || null,
-    },
-  });
+    const search = await prisma.search.create({
+      data: {
+        userId: session.user.id,
+        query,
+        location: location || null,
+      },
+    });
 
-  try {
     const results = await searchJobs(query, location, remote, contract);
 
-    // Fetch all job descriptions in parallel (with timeout)
     const descriptionsPromises = results.map(async (result) => {
       try {
         const fullDesc = await fetchJobDescription(result.url);
@@ -43,7 +55,6 @@ export async function POST(request: NextRequest) {
     });
     const descriptions = await Promise.all(descriptionsPromises);
 
-    // Create all jobs in DB
     const jobs = await Promise.all(
       results.map((result, i) =>
         prisma.job.create({
@@ -62,20 +73,11 @@ export async function POST(request: NextRequest) {
       )
     );
 
-    // Score all jobs with ATS in parallel (all at once, API handles rate limiting)
     if (profile) {
-      const profileData = {
-        skills: profile.skills,
-        currentTitle: profile.currentTitle,
-        yearsExperience: profile.yearsExperience,
-        education: profile.education,
-        location: profile.location,
-        languages: profile.languages,
-        desiredRoles: profile.desiredRoles,
-      };
+      const profileData = extractProfileForScoring(profile);
 
       await Promise.allSettled(
-        jobs.map(async (job) => {
+        jobs.map(async (job: { id: string; title: string; description: string }) => {
           try {
             const score = await scoreJobATS(profileData, job.title, job.description);
             await prisma.job.update({
@@ -87,8 +89,11 @@ export async function POST(request: NextRequest) {
                 missingSkills: score.missingSkills,
               },
             });
-          } catch {
-            // Skip scoring on failure
+          } catch (err) {
+            logger.warn("ATS scoring failed for job", {
+              jobId: job.id,
+              error: err instanceof Error ? err : new Error(String(err)),
+            });
           }
         })
       );
@@ -100,10 +105,5 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ searchId: search.id, jobs: scoredJobs });
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erreur lors de la recherche. Veuillez réessayer." },
-      { status: 500 }
-    );
-  }
+  });
 }
