@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import Anthropic from "@anthropic-ai/sdk";
 
 const anthropic = new Anthropic();
@@ -282,8 +283,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
-  const { url } = await req.json();
-  if (!url || !url.includes("linkedin.com")) {
+  const rl = checkRateLimit(`linkedin:${session.user.id}`, RATE_LIMITS.linkedin);
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Trop de requêtes. Réessayez dans une minute." }, { status: 429 });
+  }
+
+  const body = await req.json();
+  const url = typeof body.url === "string" ? body.url.trim() : "";
+
+  // Strict LinkedIn URL validation
+  const linkedinUrlPattern = /^https?:\/\/(www\.)?linkedin\.com\/in\/[a-zA-Z0-9\-_%]+\/?$/;
+  if (!url || !linkedinUrlPattern.test(url)) {
     return NextResponse.json(
       { error: "URL LinkedIn invalide. Exemple: https://linkedin.com/in/votre-profil" },
       { status: 400 }

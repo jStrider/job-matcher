@@ -3,11 +3,17 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { searchJobs, fetchJobDescription } from "@/lib/brave-search";
 import { scoreJobATS } from "@/lib/ai";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export async function POST() {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  }
+
+  const rl = checkRateLimit(`search:${session.user.id}`, RATE_LIMITS.search);
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Trop de recherches. Réessayez dans une minute." }, { status: 429 });
   }
 
   const profile = await prisma.profile.findUnique({
@@ -177,12 +183,7 @@ export async function POST() {
     });
   } catch (error) {
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erreur lors de la recherche intelligente.",
-      },
+      { error: "Erreur lors de la recherche intelligente." },
       { status: 500 }
     );
   }

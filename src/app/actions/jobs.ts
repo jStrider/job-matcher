@@ -27,9 +27,15 @@ export async function unsaveJob(jobId: string) {
   return { success: true };
 }
 
+const ALLOWED_STATUSES = new Set(["saved", "applied", "interview", "offer", "rejected"]);
+
 export async function updateJobStatus(savedJobId: string, status: string) {
   const session = await auth();
   if (!session?.user?.id) return { error: "Non authentifié" };
+
+  if (!ALLOWED_STATUSES.has(status)) {
+    return { error: "Statut invalide" };
+  }
 
   await prisma.savedJob.update({
     where: { id: savedJobId, userId: session.user.id },
@@ -45,6 +51,10 @@ export async function updateJobStatus(savedJobId: string, status: string) {
 export async function updateJobNotes(savedJobId: string, notes: string) {
   const session = await auth();
   if (!session?.user?.id) return { error: "Non authentifié" };
+
+  if (typeof notes !== "string" || notes.length > 10000) {
+    return { error: "Notes invalides ou trop longues (max 10 000 caractères)" };
+  }
 
   await prisma.savedJob.update({
     where: { id: savedJobId, userId: session.user.id },

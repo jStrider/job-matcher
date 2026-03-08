@@ -13,8 +13,11 @@ export async function GET(
 
   const { id } = await params;
 
-  const job = await prisma.job.findUnique({
-    where: { id },
+  const job = await prisma.job.findFirst({
+    where: {
+      id,
+      search: { userId: session.user.id },
+    },
   });
 
   if (!job) {

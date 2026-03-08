@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { searchJobs, fetchJobDescription } from "@/lib/brave-search";
 import { scoreJobATS } from "@/lib/ai";
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -10,9 +11,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
-  const { query, location, remote, contract } = await request.json();
+  const rl = checkRateLimit(`search:${session.user.id}`, RATE_LIMITS.search);
+  if (!rl.allowed) {
+    return NextResponse.json({ error: "Trop de recherches. Réessayez dans une minute." }, { status: 429 });
+  }
 
-  if (!query?.trim()) {
+  const body = await request.json();
+  const query = typeof body.query === "string" ? body.query.trim().slice(0, 500) : "";
+  const location = typeof body.location === "string" ? body.location.trim().slice(0, 200) : undefined;
+  const remote = typeof body.remote === "string" ? body.remote : undefined;
+  const contract = typeof body.contract === "string" ? body.contract : undefined;
+
+  if (!query) {
     return NextResponse.json({ error: "Requête de recherche requise" }, { status: 400 });
   }
 
@@ -102,7 +112,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ searchId: search.id, jobs: scoredJobs });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Erreur lors de la recherche. Veuillez réessayer." },
+      { error: "Erreur lors de la recherche. Veuillez réessayer." },
       { status: 500 }
     );
   }
