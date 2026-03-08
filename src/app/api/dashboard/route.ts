@@ -9,7 +9,7 @@ export async function GET() {
 
     const userId = session.user.id;
 
-    const [profile, recentSearches, topJobs, totalSearches, totalJobs, savedJobsCount, allJobs] =
+    const [profile, recentSearches, topJobs, totalSearches, totalJobs, savedJobsCount] =
       await Promise.all([
         prisma.profile.findUnique({
           where: { userId },
@@ -35,29 +35,46 @@ export async function GET() {
         prisma.search.count({ where: { userId } }),
         prisma.job.count({ where: { search: { userId } } }),
         prisma.savedJob.count({ where: { userId } }),
-        prisma.job.findMany({
-          where: { search: { userId }, atsScore: { not: null } },
-          select: { atsScore: true, missingSkills: true },
-        }),
       ]);
 
-    const scores: number[] = allJobs.map((j: { atsScore: number | null }) => j.atsScore!);
-    const avgScore =
-      scores.length > 0
-        ? Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length)
-        : 0;
+    // Aggregate avg score
+    const avgAgg = await prisma.job.aggregate({
+      where: { search: { userId }, atsScore: { not: null } },
+      _avg: { atsScore: true },
+    });
+    const avgScore = Math.round(avgAgg._avg.atsScore ?? 0);
 
-    const ranges = ["0-20", "21-40", "41-60", "61-80", "81-100"];
-    const scoreDistribution = ranges.map((range) => {
-      const [min, max] = range.split("-").map(Number);
-      return {
-        range,
-        count: scores.filter((s: number) => s >= min && s <= max).length,
-      };
+    // Score distribution via groupBy with raw ranges
+    const scoredJobs = await prisma.job.groupBy({
+      by: ["atsScore"],
+      where: { search: { userId }, atsScore: { not: null } },
+      _count: true,
+    });
+
+    const ranges = [
+      { range: "0-20", min: 0, max: 20 },
+      { range: "21-40", min: 21, max: 40 },
+      { range: "41-60", min: 41, max: 60 },
+      { range: "61-80", min: 61, max: 80 },
+      { range: "81-100", min: 81, max: 100 },
+    ];
+    const scoreDistribution = ranges.map(({ range, min, max }) => ({
+      range,
+      count: scoredJobs
+        .filter((g: { atsScore: number | null; _count: number }) => g.atsScore! >= min && g.atsScore! <= max)
+        .reduce((sum: number, g: { _count: number }) => sum + g._count, 0),
+    }));
+
+    // Top missing skills from a limited set of recent scored jobs
+    const recentScoredJobs = await prisma.job.findMany({
+      where: { search: { userId }, atsScore: { not: null } },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+      select: { missingSkills: true },
     });
 
     const skillCounts: Record<string, number> = {};
-    for (const job of allJobs) {
+    for (const job of recentScoredJobs) {
       for (const skill of job.missingSkills) {
         skillCounts[skill] = (skillCounts[skill] || 0) + 1;
       }

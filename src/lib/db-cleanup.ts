@@ -48,19 +48,27 @@ export async function cleanupOldSearches(): Promise<{
 
     const searchIds = oldSearches.map((s: { id: string }) => s.id);
 
-    // Delete saved jobs referencing jobs from these searches
-    await prisma.savedJob.deleteMany({
-      where: { job: { searchId: { in: searchIds } } },
+    // Skip searches that have jobs with SavedJobs
+    const searchesWithSavedJobs = await prisma.search.findMany({
+      where: {
+        id: { in: searchIds },
+        results: { some: { savedJobs: { some: {} } } },
+      },
+      select: { id: true },
     });
+    const savedSearchIds = new Set(searchesWithSavedJobs.map((s: { id: string }) => s.id));
+    const deletableSearchIds = searchIds.filter((id: string) => !savedSearchIds.has(id));
+
+    if (deletableSearchIds.length === 0) continue;
 
     // Delete jobs from these searches
     const deletedJobs = await prisma.job.deleteMany({
-      where: { searchId: { in: searchIds } },
+      where: { searchId: { in: deletableSearchIds } },
     });
 
     // Delete the searches themselves
     const deletedSearches = await prisma.search.deleteMany({
-      where: { id: { in: searchIds } },
+      where: { id: { in: deletableSearchIds } },
     });
 
     totalDeletedSearches += deletedSearches.count;

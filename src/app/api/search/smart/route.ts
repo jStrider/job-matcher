@@ -5,6 +5,7 @@ import { scoreJobATS } from "@/lib/ai";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { requireAuth, isAuthError, apiHandler, extractProfileForScoring } from "@/lib/api-utils";
 import { logger } from "@/lib/logger";
+import { pLimit } from "@/lib/utils";
 
 export async function POST() {
   return apiHandler("search/smart/POST", async () => {
@@ -132,27 +133,30 @@ export async function POST() {
     );
 
     const profileData = extractProfileForScoring(profile);
+    const limit = pLimit(3);
 
     await Promise.allSettled(
-      jobs.map(async (job: { id: string; title: string; description: string }) => {
-        try {
-          const score = await scoreJobATS(profileData, job.title, job.description);
-          await prisma.job.update({
-            where: { id: job.id },
-            data: {
-              atsScore: score.totalScore,
-              scoreBreakdown: JSON.parse(JSON.stringify(score.breakdown)),
-              matchingSkills: score.matchingSkills,
-              missingSkills: score.missingSkills,
-            },
-          });
-        } catch (err) {
-          logger.warn("Smart search ATS scoring failed", {
-            jobId: job.id,
-            error: err instanceof Error ? err : new Error(String(err)),
-          });
-        }
-      })
+      jobs.map((job: { id: string; title: string; description: string }) =>
+        limit(async () => {
+          try {
+            const score = await scoreJobATS(profileData, job.title, job.description);
+            await prisma.job.update({
+              where: { id: job.id },
+              data: {
+                atsScore: score.totalScore,
+                scoreBreakdown: JSON.parse(JSON.stringify(score.breakdown)),
+                matchingSkills: score.matchingSkills,
+                missingSkills: score.missingSkills,
+              },
+            });
+          } catch (err) {
+            logger.warn("Smart search ATS scoring failed", {
+              jobId: job.id,
+              error: err instanceof Error ? err : new Error(String(err)),
+            });
+          }
+        })
+      )
     );
 
     const scoredJobs = await prisma.job.findMany({
