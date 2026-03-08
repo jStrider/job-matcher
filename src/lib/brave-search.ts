@@ -79,7 +79,7 @@ function parseJobFromResult(result: BraveSearchResult): ParsedJobResult {
 
   const parts = title.split(" - ");
 
-  let jobTitle = parts[0]?.trim() || title;
+  const jobTitle = parts[0]?.trim() || title;
   let company = "Entreprise non specifiee";
   let location: string | null = null;
 
