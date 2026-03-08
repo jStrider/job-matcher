@@ -26,6 +26,14 @@ export async function extractProfile(rawText: string): Promise<ExtractedProfile>
         role: "user",
         content: `Analyse ce CV/profil et extrais les informations structurees. Reponds UNIQUEMENT en JSON valide, sans markdown.
 
+IMPORTANT pour "desiredRoles": Tu DOIS deduire au minimum 5 a 8 titres de postes pertinents, meme s'ils ne sont pas explicitement mentionnes dans le profil. Base-toi sur:
+- Le titre actuel (et ses variantes: Senior, Lead, Principal, Head of, Responsable, etc.)
+- L'experience et les competences pour deduire des roles connexes
+- Les intitules courants sur le marche francais (ex: "Ingenieur DevOps", "SRE", "Platform Engineer" sont des roles connexes)
+- Des variantes en francais ET en anglais
+
+Exemple: si le titre est "DevOps Engineer", genere: ["DevOps Engineer", "Ingénieur DevOps", "Senior DevOps Engineer", "Lead DevOps", "SRE", "Site Reliability Engineer", "Platform Engineer", "Cloud Engineer"]
+
 CV/Profil:
 ${rawText}
 
@@ -38,7 +46,7 @@ Format de reponse JSON:
   "languages": ["Francais", "Anglais"],
   "education": "formation principale",
   "location": "ville, pays",
-  "desiredRoles": ["role1", "role2"],
+  "desiredRoles": ["role1", "role2", "role3", "role4", "role5", "role6", "role7", "role8"],
   "desiredSalary": "fourchette salariale si mentionnee ou vide",
   "remotePreference": "remote|hybrid|onsite|non specifie"
 }`,

@@ -24,9 +24,9 @@ export async function POST() {
   // Build multiple targeted searches based on profile
   const searches: { query: string; location?: string }[] = [];
 
-  // Search by desired roles
+  // Search by ALL desired roles (not just first 3)
   if (profile.desiredRoles.length > 0) {
-    for (const role of profile.desiredRoles.slice(0, 3)) {
+    for (const role of profile.desiredRoles) {
       searches.push({
         query: role,
         location: profile.location || undefined,
@@ -34,21 +34,31 @@ export async function POST() {
     }
   }
 
-  // Search by current title
-  if (profile.currentTitle) {
+  // Search by current title if not already in desiredRoles
+  if (profile.currentTitle && !profile.desiredRoles.some(
+    (r) => r.toLowerCase() === profile.currentTitle?.toLowerCase()
+  )) {
     searches.push({
       query: profile.currentTitle,
       location: profile.location || undefined,
     });
   }
 
-  // Search by top skills combo
+  // Add skill-based search variants (combine 2-3 top skills with job-related terms)
   if (profile.skills.length >= 2) {
     const topSkills = profile.skills.slice(0, 3).join(" ");
     searches.push({
-      query: topSkills,
+      query: `${topSkills} emploi`,
       location: profile.location || undefined,
     });
+    // Secondary combo with different skills
+    if (profile.skills.length >= 4) {
+      const altSkills = profile.skills.slice(1, 4).join(" ");
+      searches.push({
+        query: `${altSkills} recrutement`,
+        location: profile.location || undefined,
+      });
+    }
   }
 
   if (searches.length === 0) {
