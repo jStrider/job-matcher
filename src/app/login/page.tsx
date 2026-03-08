@@ -6,7 +6,7 @@ import { registerUser, loginUser } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Briefcase } from "lucide-react";
+import { Briefcase, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const [isRegister, setIsRegister] = useState(false);
@@ -79,15 +79,22 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <p className="text-sm text-red-400">{error}</p>
+              <div className="rounded-lg border border-red-800 bg-red-900/20 p-3 text-sm text-red-400" role="alert">
+                {error}
+              </div>
             )}
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading
-                ? "Chargement..."
-                : isRegister
-                ? "Créer le compte"
-                : "Se connecter"}
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                  Chargement...
+                </>
+              ) : isRegister ? (
+                "Créer le compte"
+              ) : (
+                "Se connecter"
+              )}
             </Button>
           </form>
 
