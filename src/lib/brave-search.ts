@@ -1,4 +1,13 @@
+import crypto from "crypto";
 import { logger } from "@/lib/logger";
+
+// Simple in-memory cache with TTL for Brave search results
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const searchCache = new Map<string, { data: ParsedJobResult[]; expiry: number }>();
+
+function getCacheKey(query: string, location?: string): string {
+  return crypto.createHash("md5").update(`${query}|${location ?? ""}`).digest("hex");
+}
 
 export interface BraveSearchResult {
   title: string;
@@ -118,6 +127,12 @@ export async function searchJobs(
   const apiKey = process.env.BRAVE_API_KEY;
   if (!apiKey) throw new Error("BRAVE_API_KEY non configuree");
 
+  const cacheKey = getCacheKey(`${query}|${remote ?? ""}|${contract ?? ""}|${count}`, location);
+  const cached = searchCache.get(cacheKey);
+  if (cached && cached.expiry > Date.now()) {
+    return cached.data;
+  }
+
   const sites = "site:linkedin.com/jobs/view OR site:indeed.fr/viewjob OR site:welcometothejungle.com/fr/companies/*/jobs/* OR site:apec.fr OR site:francetravail.fr";
   const locationQuery = location ? ` ${location}` : "";
   const remoteQuery = remote === "remote" ? " teletravail" : remote === "hybrid" ? " hybride" : "";
@@ -148,11 +163,15 @@ export async function searchJobs(
   const data = await response.json();
   const results: BraveSearchResult[] = data.web?.results || [];
 
-  return results
+  const parsed = results
     .filter((r) => !isAggregatedResult(r))
     .filter((r) => isIndividualJobUrl(r.url))
     .map(parseJobFromResult)
     .slice(0, count);
+
+  searchCache.set(cacheKey, { data: parsed, expiry: Date.now() + CACHE_TTL_MS });
+
+  return parsed;
 }
 
 export async function fetchJobDescription(url: string): Promise<string> {

@@ -57,11 +57,26 @@ export async function updateJobStatus(savedJobId: string, status: string) {
   }
 
   try {
+    const newStatus = parsed.data.status;
+    let appliedAt: Date | null | undefined = undefined;
+
+    if (newStatus === "saved") {
+      appliedAt = null;
+    } else if (["applied", "interview", "offer"].includes(newStatus)) {
+      const existing = await prisma.savedJob.findUnique({
+        where: { id: savedJobId, userId: session.user.id },
+        select: { appliedAt: true },
+      });
+      if (!existing?.appliedAt) {
+        appliedAt = new Date();
+      }
+    }
+
     await prisma.savedJob.update({
       where: { id: savedJobId, userId: session.user.id },
       data: {
-        status: parsed.data.status,
-        appliedAt: parsed.data.status === "applied" ? new Date() : undefined,
+        status: newStatus,
+        ...(appliedAt !== undefined && { appliedAt }),
       },
     });
     return { success: true };
