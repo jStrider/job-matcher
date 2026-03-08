@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { logger } from "@/lib/logger";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -55,7 +56,16 @@ Format de reponse JSON:
   });
 
   const text = message.content[0].type === "text" ? message.content[0].text : "";
-  return JSON.parse(text);
+
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    logger.error("Failed to parse AI profile response", {
+      error: err instanceof Error ? err : new Error(String(err)),
+      responsePreview: text.substring(0, 200),
+    });
+    throw new Error("Reponse AI invalide");
+  }
 }
 
 export interface ATSScore {
@@ -131,5 +141,15 @@ Reponds avec ce JSON:
   });
 
   const text = message.content[0].type === "text" ? message.content[0].text : "";
-  return JSON.parse(text);
+
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    logger.error("Failed to parse AI ATS score response", {
+      error: err instanceof Error ? err : new Error(String(err)),
+      jobTitle,
+      responsePreview: text.substring(0, 200),
+    });
+    throw new Error("Reponse AI invalide pour le scoring ATS");
+  }
 }

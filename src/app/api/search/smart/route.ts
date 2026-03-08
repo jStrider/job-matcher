@@ -1,98 +1,92 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { searchJobs, fetchJobDescription } from "@/lib/brave-search";
 import { scoreJobATS } from "@/lib/ai";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
+import { requireAuth, isAuthError, apiHandler, extractProfileForScoring } from "@/lib/api-utils";
+import { logger } from "@/lib/logger";
 
 export async function POST() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-  }
+  return apiHandler("search/smart/POST", async () => {
+    const session = await requireAuth();
+    if (isAuthError(session)) return session;
 
-  const rl = checkRateLimit(`search:${session.user.id}`, RATE_LIMITS.search);
-  if (!rl.allowed) {
-    return NextResponse.json({ error: "Trop de recherches. Réessayez dans une minute." }, { status: 429 });
-  }
+    const rl = checkRateLimit(`search:${session.user.id}`, RATE_LIMITS.search);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Trop de recherches. Réessayez dans une minute." }, { status: 429 });
+    }
 
-  const profile = await prisma.profile.findUnique({
-    where: { userId: session.user.id },
-  });
+    const profile = await prisma.profile.findUnique({
+      where: { userId: session.user.id },
+    });
 
-  if (!profile) {
-    return NextResponse.json(
-      { error: "Créez d'abord votre profil pour utiliser la recherche intelligente." },
-      { status: 400 }
-    );
-  }
+    if (!profile) {
+      return NextResponse.json(
+        { error: "Creez d'abord votre profil pour utiliser la recherche intelligente." },
+        { status: 400 }
+      );
+    }
 
-  // Build multiple targeted searches based on profile
-  const searches: { query: string; location?: string }[] = [];
+    const searches: { query: string; location?: string }[] = [];
 
-  // Search by desired roles (cap at 5 to limit API calls)
-  if (profile.desiredRoles.length > 0) {
-    for (const role of profile.desiredRoles.slice(0, 5)) {
+    if (profile.desiredRoles.length > 0) {
+      for (const role of profile.desiredRoles.slice(0, 5)) {
+        searches.push({
+          query: role,
+          location: profile.location || undefined,
+        });
+      }
+    }
+
+    if (
+      profile.currentTitle &&
+      !profile.desiredRoles.some(
+        (r: string) => r.toLowerCase() === profile.currentTitle?.toLowerCase()
+      )
+    ) {
       searches.push({
-        query: role,
+        query: profile.currentTitle,
         location: profile.location || undefined,
       });
     }
-  }
 
-  // Search by current title if not already in desiredRoles
-  if (profile.currentTitle && !profile.desiredRoles.some(
-    (r) => r.toLowerCase() === profile.currentTitle?.toLowerCase()
-  )) {
-    searches.push({
-      query: profile.currentTitle,
-      location: profile.location || undefined,
-    });
-  }
-
-  // Add skill-based search variants (combine 2-3 top skills with job-related terms)
-  if (profile.skills.length >= 2) {
-    const topSkills = profile.skills.slice(0, 3).join(" ");
-    searches.push({
-      query: `${topSkills} emploi`,
-      location: profile.location || undefined,
-    });
-    // Secondary combo with different skills
-    if (profile.skills.length >= 4) {
-      const altSkills = profile.skills.slice(1, 4).join(" ");
+    if (profile.skills.length >= 2) {
+      const topSkills = profile.skills.slice(0, 3).join(" ");
       searches.push({
-        query: `${altSkills} recrutement`,
+        query: `${topSkills} emploi`,
         location: profile.location || undefined,
       });
+      if (profile.skills.length >= 4) {
+        const altSkills = profile.skills.slice(1, 4).join(" ");
+        searches.push({
+          query: `${altSkills} recrutement`,
+          location: profile.location || undefined,
+        });
+      }
     }
-  }
 
-  if (searches.length === 0) {
-    return NextResponse.json(
-      { error: "Profil trop incomplet pour la recherche intelligente. Ajoutez des rôles ou compétences." },
-      { status: 400 }
-    );
-  }
+    if (searches.length === 0) {
+      return NextResponse.json(
+        { error: "Profil trop incomplet pour la recherche intelligente. Ajoutez des roles ou competences." },
+        { status: 400 }
+      );
+    }
 
-  // Create a combined search record
-  const queryDesc = searches.map((s) => s.query).join(" | ");
-  const search = await prisma.search.create({
-    data: {
-      userId: session.user.id,
-      query: `🔮 Smart: ${queryDesc}`,
-      location: profile.location,
-    },
-  });
+    const queryDesc = searches.map((s) => s.query).join(" | ");
+    const search = await prisma.search.create({
+      data: {
+        userId: session.user.id,
+        query: `Smart: ${queryDesc}`,
+        location: profile.location,
+      },
+    });
 
-  try {
-    // Run all searches in parallel
     const allResults = await Promise.allSettled(
       searches.map((s) =>
         searchJobs(s.query, s.location, profile.remotePreference || undefined)
       )
     );
 
-    // Flatten and deduplicate by URL
     const seenUrls = new Set<string>();
     const uniqueResults = allResults
       .flatMap((r) => (r.status === "fulfilled" ? r.value : []))
@@ -101,16 +95,15 @@ export async function POST() {
         seenUrls.add(r.url);
         return true;
       })
-      .slice(0, 15); // Cap at 15 to avoid too many API calls
+      .slice(0, 15);
 
     if (uniqueResults.length === 0) {
       return NextResponse.json(
-        { error: "Aucun résultat trouvé. Essayez une recherche manuelle." },
+        { error: "Aucun resultat trouve. Essayez une recherche manuelle." },
         { status: 404 }
       );
     }
 
-    // Fetch descriptions in parallel
     const descriptions = await Promise.all(
       uniqueResults.map(async (result) => {
         try {
@@ -122,7 +115,6 @@ export async function POST() {
       })
     );
 
-    // Create jobs in DB
     const jobs = await Promise.all(
       uniqueResults.map((result, i) =>
         prisma.job.create({
@@ -139,19 +131,10 @@ export async function POST() {
       )
     );
 
-    // Score all with ATS
-    const profileData = {
-      skills: profile.skills,
-      currentTitle: profile.currentTitle,
-      yearsExperience: profile.yearsExperience,
-      education: profile.education,
-      location: profile.location,
-      languages: profile.languages,
-      desiredRoles: profile.desiredRoles,
-    };
+    const profileData = extractProfileForScoring(profile);
 
     await Promise.allSettled(
-      jobs.map(async (job) => {
+      jobs.map(async (job: { id: string; title: string; description: string }) => {
         try {
           const score = await scoreJobATS(profileData, job.title, job.description);
           await prisma.job.update({
@@ -163,13 +146,15 @@ export async function POST() {
               missingSkills: score.missingSkills,
             },
           });
-        } catch {
-          // Skip
+        } catch (err) {
+          logger.warn("Smart search ATS scoring failed", {
+            jobId: job.id,
+            error: err instanceof Error ? err : new Error(String(err)),
+          });
         }
       })
     );
 
-    // Return sorted by score
     const scoredJobs = await prisma.job.findMany({
       where: { searchId: search.id },
       orderBy: { atsScore: { sort: "desc", nulls: "last" } },
@@ -181,10 +166,5 @@ export async function POST() {
       query: queryDesc,
       searchesRun: searches.length,
     });
-  } catch (error) {
-    return NextResponse.json(
-      { error: "Erreur lors de la recherche intelligente." },
-      { status: 500 }
-    );
-  }
+  });
 }

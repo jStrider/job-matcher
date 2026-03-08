@@ -1,32 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireAuth, isAuthError, apiHandler } from "@/lib/api-utils";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
-  }
+  return apiHandler("job/[id]/GET", async () => {
+    const session = await requireAuth();
+    if (isAuthError(session)) return session;
 
-  const { id } = await params;
+    const { id } = await params;
 
-  const job = await prisma.job.findFirst({
-    where: {
-      id,
-      search: { userId: session.user.id },
-    },
+    if (!id) {
+      return NextResponse.json({ error: "ID requis" }, { status: 400 });
+    }
+
+    const job = await prisma.job.findFirst({
+      where: {
+        id,
+        search: { userId: session.user.id },
+      },
+      select: {
+        id: true,
+        title: true,
+        company: true,
+        location: true,
+        salary: true,
+        remote: true,
+        contract: true,
+        description: true,
+        url: true,
+        source: true,
+        atsScore: true,
+        scoreBreakdown: true,
+        matchingSkills: true,
+        missingSkills: true,
+        createdAt: true,
+      },
+    });
+
+    if (!job) {
+      return NextResponse.json({ error: "Offre non trouvee" }, { status: 404 });
+    }
+
+    const savedJob = await prisma.savedJob.findUnique({
+      where: { userId_jobId: { userId: session.user.id, jobId: id } },
+      select: { id: true },
+    });
+
+    return NextResponse.json({ job, isSaved: !!savedJob });
   });
-
-  if (!job) {
-    return NextResponse.json({ error: "Offre non trouvée" }, { status: 404 });
-  }
-
-  const savedJob = await prisma.savedJob.findUnique({
-    where: { userId_jobId: { userId: session.user.id, jobId: id } },
-  });
-
-  return NextResponse.json({ job, isSaved: !!savedJob });
 }
