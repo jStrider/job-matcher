@@ -13,26 +13,42 @@ export const linkedinUrlSchema = z.object({
   url: z
     .string()
     .min(1, "URL requise")
-    .refine((url) => url.includes("linkedin.com"), {
-      message: "URL LinkedIn invalide. Exemple: https://linkedin.com/in/votre-profil",
-    }),
+    .refine(
+      (url) => {
+        try {
+          const parsed = new URL(url);
+          return parsed.hostname === "linkedin.com" || parsed.hostname === "www.linkedin.com";
+        } catch {
+          return false;
+        }
+      },
+      {
+        message: "URL LinkedIn invalide. Exemple: https://linkedin.com/in/votre-profil",
+      }
+    ),
 });
 
 export const jobStatusSchema = z.object({
   status: z.enum(["saved", "applied", "interview", "offer", "rejected"]),
 });
 
-export const profileFieldSchema = z.object({
-  field: z.enum([
-    "summary",
-    "currentTitle",
-    "skills",
-    "languages",
-    "education",
-    "location",
-    "desiredRoles",
-    "desiredSalary",
-    "remotePreference",
-  ]),
-  value: z.union([z.string(), z.array(z.string())]),
+const stringFieldSchema = z.object({
+  field: z.enum(["summary", "currentTitle", "education", "location", "desiredSalary", "remotePreference"]),
+  value: z.string(),
 });
+
+const arrayFieldSchema = z.object({
+  field: z.enum(["skills", "languages", "desiredRoles"]),
+  value: z.array(z.string()),
+});
+
+const numberFieldSchema = z.object({
+  field: z.literal("yearsExperience"),
+  value: z.number(),
+});
+
+export const profileFieldSchema = z.discriminatedUnion("field", [
+  stringFieldSchema,
+  arrayFieldSchema,
+  numberFieldSchema,
+]);

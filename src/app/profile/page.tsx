@@ -21,7 +21,6 @@ import {
   Languages,
   Link as LinkIcon,
   AlertCircle,
-  RefreshCw,
 } from "lucide-react";
 
 interface ProfileData {

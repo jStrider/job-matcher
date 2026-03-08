@@ -1,8 +1,45 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
 import { logger } from "@/lib/logger";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+const extractedProfileSchema = z.object({
+  summary: z.string().default(""),
+  currentTitle: z.string().default(""),
+  yearsExperience: z.number().default(0),
+  skills: z.array(z.string()).default([]),
+  languages: z.array(z.string()).default([]),
+  education: z.string().default(""),
+  location: z.string().default(""),
+  desiredRoles: z.array(z.string()).default([]),
+  desiredSalary: z.string().default(""),
+  remotePreference: z.string().default("non specifie"),
+});
+
+const atsBreakdownItemSchema = z.object({
+  score: z.number().default(0),
+  max: z.number().default(0),
+  details: z.string().default(""),
+});
+
+const atsScoreSchema = z.object({
+  totalScore: z.number().default(0),
+  breakdown: z.object({
+    keywordMatch: atsBreakdownItemSchema.default({}),
+    skillsAlignment: atsBreakdownItemSchema.default({}),
+    experienceRelevance: atsBreakdownItemSchema.default({}),
+    jobTitleMatch: atsBreakdownItemSchema.default({}),
+    educationMatch: atsBreakdownItemSchema.default({}),
+    locationMatch: atsBreakdownItemSchema.default({}),
+    languageMatch: atsBreakdownItemSchema.default({}),
+    overallFit: atsBreakdownItemSchema.default({}),
+  }).default({}),
+  matchingSkills: z.array(z.string()).default([]),
+  missingSkills: z.array(z.string()).default([]),
+  recommendations: z.array(z.string()).default([]),
 });
 
 export interface ExtractedProfile {
@@ -58,7 +95,8 @@ Format de reponse JSON:
   const text = message.content[0].type === "text" ? message.content[0].text : "";
 
   try {
-    return JSON.parse(text);
+    const raw = JSON.parse(text);
+    return extractedProfileSchema.parse(raw);
   } catch (err) {
     logger.error("Failed to parse AI profile response", {
       error: err instanceof Error ? err : new Error(String(err)),
@@ -143,7 +181,8 @@ Reponds avec ce JSON:
   const text = message.content[0].type === "text" ? message.content[0].text : "";
 
   try {
-    return JSON.parse(text);
+    const raw = JSON.parse(text);
+    return atsScoreSchema.parse(raw);
   } catch (err) {
     logger.error("Failed to parse AI ATS score response", {
       error: err instanceof Error ? err : new Error(String(err)),

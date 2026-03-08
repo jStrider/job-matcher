@@ -23,7 +23,7 @@ export const prisma = new Proxy({} as PrismaClient, {
     const client = globalForPrisma.prisma as unknown as Record<string | symbol, unknown>;
     const value = client[prop];
     if (typeof value === "function") {
-      return (value as Function).bind(globalForPrisma.prisma);
+      return (value as (...args: unknown[]) => unknown).bind(globalForPrisma.prisma);
     }
     return value;
   },

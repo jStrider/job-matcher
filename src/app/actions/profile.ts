@@ -61,7 +61,7 @@ export async function saveProfile(formData: FormData) {
   redirect("/dashboard");
 }
 
-export async function updateProfileField(field: string, value: string | string[]) {
+export async function updateProfileField(field: string, value: string | string[] | number) {
   const session = await auth();
   if (!session?.user?.id) return { error: "Non authentifie" };
 
